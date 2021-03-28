@@ -1,20 +1,10 @@
 <template>
-  <component
-    :is="tag"
-    role="tree"
-    :class="{'tree': true, 'tree-loading': this.loading, 'tree--draggable' : !!this.draggableNode}"
-  >
-    <template v-if="filter && matches.length == 0">
-      <div
-        class="tree-filter-empty"
-        v-html="opts.filter.emptyText"
-      />
+  <component :is="tag" role="tree" :class="{'tree': true, 'tree-loading': this.loading, 'tree--draggable' : !!this.draggableNode}">
+    <template v-if="filter && matches.length == 0" >
+      <div class="tree-filter-empty" v-html="opts.filter.emptyText"></div>
     </template>
     <template v-else>
-      <ul
-        class="tree-root"
-        @dragstart="onDragStart"
-      >
+      <ul class="tree-root" @dragstart="onDragStart">
         <template v-if="opts.filter.plainList && matches.length > 0">
           <TreeNode
             v-for="node in visibleMatches"
@@ -34,10 +24,7 @@
       </ul>
     </template>
 
-    <DraggableNode
-      v-if="draggableNode"
-      :target="draggableNode"
-    />
+    <DraggableNode v-if="draggableNode" :target="draggableNode" />
   </component>
 </template>
 
@@ -47,6 +34,7 @@
   import TreeMixin from '../mixins/TreeMixin.js'
   import TreeDnd from '../mixins/DndMixin.js'
   import Tree from '../lib/Tree.js'
+  import mercure from "../../../../src/plugins/mercure";
 
   const defaults = {
     direction: 'ltr',
@@ -100,6 +88,7 @@
 
     props: {
       data: {},
+      remoteUrl: null,
 
       options: {
         type: Object,
@@ -113,6 +102,60 @@
         default: 'div'
       }
     },
+
+    watch: {
+      filter (term) {
+        this.tree.filter(term)
+      }
+    },
+
+    computed: {
+      visibleModel() {
+        return this.model.filter(function(node) {
+          return node && node.visible()
+        }) 
+      },
+
+      visibleMatches() {
+        return this.matches.filter(function(node) {
+          return node && node.visible()
+        })
+      }
+    },
+
+    methods: {
+      refresh() {
+        console.log("TEST")
+        this.$axios.get(this.remoteUrl).then(res => {
+
+          var LTT = require('list-to-tree');
+
+          var treeData = res.data["hydra:member"];
+
+          treeData.forEach(e => {
+            if(e.parentId===undefined){
+              e.parentId = 0;
+            }
+          })
+
+          var ltt = new LTT(treeData,{
+            key_id: 'id',
+            key_parent: 'parentId'
+          })
+
+          var treeData2 = ltt.GetTree();
+
+          this.treeData = {
+            text: "Liste des catégories",
+            state: { selected: true },
+            child: treeData2,
+          }
+
+        });
+      }
+    },
+
+
 
     data () {
       // we should not mutating a prop directly...
@@ -129,31 +172,13 @@
       return {
         model: [],
         tree: null,
+        treeData: this.data,
         loading: false,
         opts,
         matches: [],
         draggableNode: null
       }
-    },
-
-    computed: {
-      visibleModel() {
-        return this.model.filter(function(node) {
-          return node && node.visible()
-        }) 
-      },
-      visibleMatches() {
-        return this.matches.filter(function(node) {
-          return node && node.visible()
-        })
-      }
-    },
-    
-    watch: {
-      filter (term) {
-        this.tree.filter(term)
-      }
-    },
+    }
   }
 </script>
 
